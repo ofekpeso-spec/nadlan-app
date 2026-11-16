@@ -1,0 +1,4 @@
+mcp==2.3.0
+requests>=2.31
+uvicorn>=0.30
+pytest>=8
