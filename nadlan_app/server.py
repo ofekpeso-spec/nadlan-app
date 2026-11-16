@@ -23,7 +23,9 @@ from . import datagov
 from .datagov import DataGovClient, DataGovError
 
 APP_NAME = "Nadlan IL"
-SOURCE_NOTE = "Source: data.gov.il — Israel's official open government data portal."
+SOURCE_NOTE = ("Source: data.gov.il — Israel's official open government data portal. "
+               "General information only, not legal/planning/financial advice; data may be outdated. "
+               "Verify with the relevant authority (e.g. the municipality) before any decision.")
 DEALS_NOTE = ("Recorded sale prices for specific apartments are not available through this app. "
               "Users can look them up for free on the official site https://www.nadlan.gov.il")
 
@@ -32,6 +34,8 @@ urban renewal / פינוי-בינוי complexes, active construction sites (nois
 Mechir LaMishtaken / דירה בהנחה lotteries, and the housing development pipeline.
 Pass the city in Hebrew when possible (e.g. 'תל אביב יפו', 'חולון') and optionally a street name.
 Records come from different ministries, so field names vary: summarise them in plain language.
+Always remind the user briefly that this is general information that may be outdated, and that they should
+verify with the relevant authority (municipality, urban-renewal administration) before deciding.
 {DEALS_NOTE}
 Answer in the user's language."""
 
