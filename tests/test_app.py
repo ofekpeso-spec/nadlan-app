@@ -156,3 +156,11 @@ def test_slim_keeps_key_fields_and_survives_schema_change():
     odd = {"x": 1, "y": 2}
     assert datagov.slim("mechir_lamishtaken", odd) == odd
     assert datagov.slim("housing_pipeline", odd) == odd
+
+
+def test_usage_stats_tracked(fake):
+    before = server.STATS["calls"]
+    _call("area_report", {"city": "חולון", "street": "סוקולוב"})
+    assert server.STATS["calls"] == before + 1
+    assert server.STATS["by_city"]["חולון"] >= 1
+    assert server.STATS["recent"][0]["street"] == "סוקולוב"
