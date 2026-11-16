@@ -165,6 +165,11 @@ def query_open_dataset(
         return {"ok": False, "error": str(e)}
 
 
+@mcp.custom_route("/", methods=["GET"])
+async def home(_: Request) -> FileResponse:
+    return FileResponse(STATIC / "index.html", media_type="text/html; charset=utf-8")
+
+
 @mcp.custom_route("/icon.png", methods=["GET"])
 async def icon(_: Request) -> FileResponse:
     return FileResponse(STATIC / "icon.png", media_type="image/png")

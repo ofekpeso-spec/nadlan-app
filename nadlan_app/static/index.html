@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nadlan IL · בדיקת אזור לפני שקונים דירה</title>
+<meta name="description" content="פינוי-בינוי, אתרי בנייה, הגרלות מחיר למשתכן ודירות חדשות בדרך, לכל עיר ורחוב בישראל, ישירות בתוך Claude ו-ChatGPT. מבוסס על המידע הרשמי של המדינה.">
+<link rel="icon" href="/favicon.ico">
+<meta property="og:title" content="Nadlan IL · בדיקת אזור לפני שקונים דירה">
+<meta property="og:description" content="שאלו את Claude או את ChatGPT על כל רחוב בישראל, וקבלו תשובות מהמאגרים הרשמיים של המדינה.">
+<meta property="og:image" content="/icon.png">
+<style>
+  :root{
+    --ink:#14213d; --muted:#5b6478; --line:#e4e8f0; --bg:#f7f8fb; --card:#fff;
+    --blue:#1852a8; --blue-soft:#e8effa; --amber:#f5b02e; --amber-soft:#fff5df;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Rubik","Assistant","Segoe UI",Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
+  a{color:var(--blue)}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  header.top{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;text-decoration:none;color:var(--ink)}
+  .brand img{width:36px;height:36px;border-radius:9px}
+  .top nav a{margin-inline-start:18px;text-decoration:none;color:var(--muted);font-size:15px}
+  .top nav a:hover{color:var(--ink)}
+
+  .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center;padding:36px 0 56px}
+  .eyebrow{display:inline-block;background:var(--amber-soft);color:#8a5a00;font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px}
+  h1{font-size:44px;line-height:1.15;margin:14px 0 14px;letter-spacing:-.5px}
+  h1 em{font-style:normal;color:var(--blue)}
+  .lead{font-size:18px;color:var(--muted);margin:0 0 26px;max-width:34em}
+  .cta{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:10px;font-weight:600;text-decoration:none;font-size:16px;border:1px solid transparent;cursor:pointer}
+  .btn.primary{background:var(--blue);color:#fff}
+  .btn.primary:hover{background:#12428a}
+  .btn.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+  .note{font-size:13px;color:var(--muted);margin-top:14px}
+
+  .chat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(20,33,61,.07)}
+  .msg{border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:15px}
+  .msg.user{background:var(--blue-soft);margin-inline-start:40px}
+  .msg.ai{background:#fbfbfd;border:1px solid var(--line)}
+  .msg.ai ul{margin:6px 0 0;padding-inline-start:20px}
+  .msg.ai li{margin:3px 0}
+  .who{font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+  .src{font-size:12px;color:var(--muted);margin-top:8px}
+
+  section{padding:52px 0;border-top:1px solid var(--line)}
+  h2{font-size:30px;margin:0 0 8px}
+  .sub{color:var(--muted);margin:0 0 28px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .card h3{margin:0 0 6px;font-size:18px;display:flex;align-items:center;gap:10px}
+  .card p{margin:0;color:var(--muted);font-size:15px}
+  .ico{width:34px;height:34px;border-radius:9px;background:var(--blue-soft);display:inline-flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+  .ask{margin-top:10px;font-size:14px;color:var(--ink);background:var(--bg);border-radius:8px;padding:8px 10px}
+
+  .steps{counter-reset:s;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .step h3{margin:0 0 10px;font-size:18px}
+  .step ol{margin:0;padding-inline-start:20px;color:var(--muted);font-size:15px}
+  .step li{margin:6px 0}
+  .url{display:flex;gap:8px;align-items:center;margin-top:8px;direction:ltr}
+  .url code{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;overflow-x:auto;white-space:nowrap}
+  .url button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit;font-size:14px}
+
+  .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .fact{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .fact b{display:block;font-size:16px;margin-bottom:4px}
+  .fact span{color:var(--muted);font-size:14px}
+
+  .grid>*,.steps>*,.facts>*,.hero>*{min-width:0}
+  .url code{min-width:0}
+  body{overflow-wrap:anywhere}
+  .disclaimer{background:var(--amber-soft);border:1px solid #f2dfb0;border-radius:12px;padding:14px 16px;font-size:14px;color:#5e4a1a;margin-top:22px}
+  footer{padding:30px 0 50px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+  footer .links a{margin-inline-end:16px}
+  @media (max-width:820px){
+    .hero{grid-template-columns:1fr;gap:28px;padding-top:12px}
+    h1{font-size:34px}
+    .grid,.steps,.facts{grid-template-columns:1fr}
+    .top nav{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/"><img src="/icon.png" alt="">Nadlan IL</a>
+    <nav>
+      <a href="#what">מה אפשר לשאול</a>
+      <a href="#connect">איך מחברים</a>
+      <a href="#data">מאיפה המידע</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <span class="eyebrow">חינם · בלי הרשמה · מידע רשמי של המדינה</span>
+      <h1>לפני שקונים דירה,<br><em>תדעו מה קורה ברחוב.</em></h1>
+      <p class="lead">יש פינוי־בינוי בבניין? אתר בנייה מתחת לחלון? כמה דירות חדשות בדרך לשכונה? שאלו את Claude או את ChatGPT בעברית, וקבלו תשובה מהמאגרים הרשמיים של המדינה.</p>
+      <div class="cta">
+        <a class="btn primary" href="#connect">חברו ל-Claude</a>
+        <a class="btn ghost" href="#what">מה אפשר לשאול?</a>
+      </div>
+      <p class="note">לוקח פחות מדקה. בלי חשבון ובלי כרטיס אשראי.</p>
+    </div>
+
+    <div class="chat" aria-label="דוגמה לשיחה">
+      <div class="msg user"><div class="who">אתם</div>יש פינוי בינוי ברחוב סוקולוב בחולון? ומה עוד כדאי לדעת על האזור?</div>
+      <div class="msg ai"><div class="who">Claude + Nadlan IL</div>
+        לא נמצא מתחם פינוי־בינוי מוכרז בסוקולוב. מה עוד כדאי לדעת:
+        <ul>
+          <li><b>רכבת קלה:</b> עבודות פעילות של הקו הירוק "מסוקולוב עד שד' קוגל". רעש בטווח הקצר, תחבורה טובה בטווח הארוך.</li>
+          <li><b>בסביבה:</b> מתחם קוגל מאושר, מ־842 ל־3,314 יח"ד.</li>
+        </ul>
+        <div class="src">מקור: data.gov.il · מידע כללי, כדאי לאמת מול העירייה</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="what">
+  <div class="wrap">
+    <h2>מה אפשר לשאול</h2>
+    <p class="sub">כל עיר ורחוב בישראל, בעברית או באנגלית.</p>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="ico">🏗️</span>פינוי־בינוי</h3>
+        <p>האם הבניין או הרחוב נמצאים במתחם מוכרז, כמה דירות יש היום, כמה מתוכננות, ובאיזה שלב התוכנית.</p>
+        <div class="ask">"יש פינוי בינוי ברחוב ההסתדרות בחולון?"</div>
+      </div>
+      <div class="card">
+        <h3><span class="ico">🚧</span>אתרי בנייה פעילים</h3>
+        <p>מה נבנה ליד הבית, מי הקבלן, והאם היו צווי בטיחות או קנסות. רעש ואבק עכשיו, היצע חדש אחר כך.</p>
+        <div class="ask">"אילו אתרי בנייה יש ליד הרצל בתל אביב?"</div>
+      </div>
+      <div class="card">
+        <h3><span class="ico">🎟️</span>מחיר למשתכן ודירה בהנחה</h3>
+        <p>הגרלות שהיו בעיר: מחיר למ"ר, כמה נרשמו, כמה זכו, ומי היזם.</p>
+        <div class="ask">"באיזה מחיר למ"ר היו הגרלות בבאר שבע?"</div>
+      </div>
+      <div class="card">
+        <h3><span class="ico">🏘️</span>דירות חדשות בדרך</h3>
+        <p>תוכניות דיור מאושרות ומתוכננות בעיר, ופוטנציאל יחידות הדיור לשיווק.</p>
+        <div class="ask">"כמה דירות חדשות מתוכננות בחולון?"</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="connect">
+  <div class="wrap">
+    <h2>איך מחברים</h2>
+    <p class="sub">פעם אחת, ואחר כך פשוט שואלים.</p>
+    <div class="steps">
+      <div class="step">
+        <h3>ב-Claude</h3>
+        <ol>
+          <li><span dir="ltr">Settings → Connectors → <b>Add custom connector</b></span></li>
+          <li>שם: Nadlan IL, וכתובת:
+            <div class="url"><code id="u1">https://nadlan-il.onrender.com/mcp</code><button data-copy="u1">העתק</button></div>
+          </li>
+          <li>לוחצים <span dir="ltr">Add</span> ואז <span dir="ltr">Connect</span>, פותחים שיחה חדשה ושואלים.</li>
+        </ol>
+      </div>
+      <div class="step">
+        <h3>ב-ChatGPT</h3>
+        <ol>
+          <li>מפעילים <span dir="ltr">Developer mode</span> בהגדרות, תחת <span dir="ltr">Settings → Apps</span> (בחשבונות שתומכים בזה)</li>
+          <li>יצירת אפליקציה חדשה עם הכתובת:
+            <div class="url"><code id="u2">https://nadlan-il.onrender.com/mcp</code><button data-copy="u2">העתק</button></div>
+          </li>
+          <li>בלי התחברות (No authentication), ואז שואלים.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="data">
+  <div class="wrap">
+    <h2>מאיפה המידע</h2>
+    <p class="sub">רק מאגרים ציבוריים רשמיים, דרך <a href="https://data.gov.il" target="_blank" rel="noopener">data.gov.il</a>, פורטל המידע הפתוח של ממשלת ישראל.</p>
+    <div class="facts">
+      <div class="fact"><b>מידע רשמי</b><span>מתחמי התחדשות עירונית, אתרי בנייה, הגרלות דיור ותוכניות רמ"י.</span></div>
+      <div class="fact"><b>פרטיות</b><span>אין הרשמה. האפליקציה מקבלת רק את שם העיר והרחוב, בלי שם ובלי היסטוריית שיחה.</span></div>
+      <div class="fact"><b>מחירי עסקאות?</b><span>לא כלולים. אפשר לבדוק אותם בחינם באתר הרשמי <a href="https://www.nadlan.gov.il" target="_blank" rel="noopener">nadlan.gov.il</a>.</span></div>
+    </div>
+    <div class="disclaimer">המידע כללי ועלול להיות חלקי או לא מעודכן. הוא אינו ייעוץ משפטי, תכנוני או פיננסי. לפני כל החלטה, בדקו מול הרשות המוסמכת (למשל העירייה) או מול איש מקצוע. האפליקציה היא פרויקט עצמאי ואינה קשורה לממשלה.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="https://github.com/ofekpeso-spec/nadlan-app/blob/main/PRIVACY.md" target="_blank" rel="noopener">מדיניות פרטיות</a>
+      <a href="https://github.com/ofekpeso-spec/nadlan-app/blob/main/TERMS.md" target="_blank" rel="noopener">תנאי שימוש</a>
+      <a href="https://github.com/ofekpeso-spec/nadlan-app" target="_blank" rel="noopener">קוד פתוח</a>
+      <a href="mailto:ofekpeso@gmail.com">צור קשר</a>
+    </div>
+    <p>© 2026 Nadlan IL · נבנה בישראל</p>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('[data-copy]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var t = document.getElementById(b.dataset.copy).textContent;
+      var done = function(){ b.textContent = 'הועתק ✓'; setTimeout(function(){ b.textContent = 'העתק'; }, 1600); };
+      if (navigator.clipboard) { navigator.clipboard.writeText(t).then(done, done); } else { done(); }
+    });
+  });
+</script>
+</body>
+</html>
