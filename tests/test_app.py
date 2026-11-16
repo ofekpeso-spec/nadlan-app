@@ -38,6 +38,9 @@ class FakeGovmap:
     def autocomplete(self, text, max_results=5):
         return [] if "nowhere" in text else [{"name": "הרצל 10, תל אביב-יפו", "point": [180000.0, 663000.0]}]
 
+    def polygons_near(self, point, radius_m=50):
+        return [{"polygon_id": "p1"}]
+
     def deals_by_radius(self, point, radius_m=300):
         return self.raw
 
@@ -119,3 +122,61 @@ def test_tool_calls(fake):
     assert e["ok"] and e["estimate"]["mid"] > 0
     n = _call("recent_deals", {"address": "nowhere"})
     assert n["ok"] is False and "not found" in n["error"]
+
+
+# ---- GovmapClient against a fake HTTP session (no network) -------------------
+class _Resp:
+    def __init__(self, status, data=None):
+        self.status_code, self._data = status, data
+
+    def json(self):
+        if self._data is None:
+            raise ValueError("no json")
+        return self._data
+
+
+class FakeSession:
+    """Blocks header set 0 on real-estate paths with 403, like a WAF might."""
+    def __init__(self):
+        self.calls = []
+
+    def request(self, method, url, params=None, json=None, headers=None, timeout=None):
+        self.calls.append((method, url, params, headers.get("User-Agent")))
+        if "autocomplete" in url:
+            return _Resp(200, {"resultsCount": 1, "results": [
+                {"text": "הרצל 10, תל אביב-יפו", "type": "address", "shape": "POINT(3870574.19 3771516.47)"}]})
+        if "NadlanMCP" in headers.get("User-Agent", ""):
+            return _Resp(403)
+        if "/real-estate/deals/" in url:
+            return _Resp(200, [{"polygon_id": "far", "longitude": 3871574, "latitude": 3771516},
+                               {"polygon_id": "near", "longitude": 3870580, "latitude": 3771510}])
+        if "/street-deals/" in url:
+            pid = url.rsplit("/", 1)[1]
+            return _Resp(200, {"data": [
+                {"objectid": hash((pid, i, params.get("dealType"))) % 10**6, "dealAmount": 2_000_000 + i * 10_000,
+                 "dealDate": f"2026-0{1 + i % 9}-15T00:00:00", "assetArea": 80 + i, "assetRoomNum": 3.5,
+                 "floorNumber": i % 5, "streetNameHeb": "הרצל", "houseNum": str(10 + i),
+                 "settlementNameHeb": "תל אביב-יפו", "propertyTypeDescription": "דירה"} for i in range(8)],
+                "totalCount": 8})
+        if "/neighborhood-deals/" in url:
+            return _Resp(200, {"data": []})
+        return _Resp(404)
+
+
+def test_client_flow_with_403_fallback(monkeypatch):
+    from nadlan_app import govmap
+    monkeypatch.setattr(govmap.time, "sleep", lambda s: None)
+    sess = FakeSession()
+    c = govmap.GovmapClient(session=sess)
+    hits = c.autocomplete("הרצל 10 תל אביב")
+    assert hits[0]["point"] == [3870574.19, 3771516.47]
+    raw = c.deals_by_radius(hits[0]["point"], 300)
+    deals = analytics.normalize_deals(raw)
+    assert len(deals) == 32  # 2 polygons x 2 deal types x 8
+    assert deals[0]["address"].startswith("הרצל") and deals[0]["property_type"] == "דירה"
+    # nearest polygon queried first
+    street_calls = [u for _, u, _, _ in sess.calls if "street-deals" in u]
+    assert street_calls[0].endswith("/near")
+    # after the first 403 the client remembers the working header set
+    assert c._good_headers != 0
+    assert any(d["status"] == 403 for d in c.diagnostics)

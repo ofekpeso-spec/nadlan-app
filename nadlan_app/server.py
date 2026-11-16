@@ -145,6 +145,9 @@ async def selftest(request: Request) -> JSONResponse:
             steps["autocomplete_matches"] = hits[:3]
             if not hits:
                 return {"result": "FAIL", "where": "autocomplete", **steps}
+            polys = client().polygons_near(hits[0]["point"], 50)
+            steps["polygons_found"] = len(polys)
+            steps["first_polygon"] = polys[0] if polys else None
             raw = client().deals_by_radius(hits[0]["point"], 300)
             steps["raw_deals"] = len(raw)
             steps["raw_keys"] = sorted(raw[0].keys()) if raw and isinstance(raw[0], dict) else None
@@ -158,7 +161,15 @@ async def selftest(request: Request) -> JSONResponse:
         except Exception as e:  # noqa: BLE001
             return {"result": "FAIL", "where": "exception", "error": str(e), **steps}
 
-    data = await anyio.to_thread.run_sync(run)
+    def run_with_diag() -> dict:
+        c = client()
+        if hasattr(c, "diagnostics"):
+            c.diagnostics.clear()
+        out = run()
+        out["attempts"] = list(getattr(c, "diagnostics", []))
+        return out
+
+    data = await anyio.to_thread.run_sync(run_with_diag)
     return JSONResponse(data, status_code=200 if data["result"] == "OK" else 500)
 
 

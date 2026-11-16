@@ -14,11 +14,14 @@ _KEYS = {
     "date": ["dealDate", "deal_date", "DEALDATETIME", "date"],
     "sqm": ["assetArea", "asset_area", "DEALNATURE_AREA", "area", "sqm"],
     "rooms": ["assetRoomNum", "rooms", "ASSETROOMNUM", "roomNum"],
-    "floor": ["floorNo", "floor", "FLOORNO", "floorNumber"],
-    "address": ["address_description", "addressDescription", "fullAddress", "address", "streetName"],
+    "floor": ["floorNumber", "floorNo", "FLOORNO", "floor"],
+    "address": ["address_description", "addressDescription", "fullAddress", "address"],
+    "street": ["streetNameHeb", "streetName"],
+    "house": ["houseNum", "houseNumber"],
     "city": ["settlementNameHeb", "settlementName", "city", "cityName"],
     "neighborhood": ["neighborhood", "neighborhoodName"],
-    "property_type": ["dealNature", "dealNatureDescription", "assetType", "propertyType"],
+    "property_type": ["propertyTypeDescription", "dealNature", "dealNatureDescription", "assetType", "propertyType"],
+    "id": ["objectid", "objectId", "id"],
     "year_built": ["yearBuilt", "buildingYear", "BUILDINGYEAR"],
 }
 
@@ -70,14 +73,19 @@ def normalize_deal(raw: dict) -> dict | None:
     rooms = _num(_pick(raw, "rooms"))
     floor = _pick(raw, "floor")
     year = _num(_pick(raw, "year_built"))
+    address = _pick(raw, "address")
+    if not address:
+        street, house = _pick(raw, "street"), _pick(raw, "house")
+        address = " ".join(str(p) for p in (street, house) if p) or None
     return {
+        "id": _pick(raw, "id"),
         "date": d.isoformat(),
         "price": int(round(price)),
         "sqm": round(sqm, 1) if sqm and sqm > 0 else None,
         "price_per_sqm": int(round(price / sqm)) if sqm and sqm > 0 else None,
         "rooms": rooms if rooms and rooms > 0 else None,
         "floor": str(floor) if floor is not None else None,
-        "address": _pick(raw, "address"),
+        "address": address,
         "city": _pick(raw, "city"),
         "neighborhood": _pick(raw, "neighborhood"),
         "property_type": _pick(raw, "property_type"),
@@ -90,7 +98,8 @@ def normalize_deals(raws: Iterable[dict]) -> list[dict]:
     # de-duplicate identical records, newest first
     seen, uniq = set(), []
     for d in sorted(out, key=lambda x: x["date"], reverse=True):
-        key = (d["date"], d["price"], d["address"], d["sqm"], d["floor"])
+        key = (d["id"], d["date"], d["price"]) if d.get("id") is not None else (
+            d["date"], d["price"], d["address"], d["sqm"], d["floor"])
         if key not in seen:
             seen.add(key)
             uniq.append(d)
