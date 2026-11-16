@@ -147,3 +147,12 @@ def test_service_down_gives_friendly_error(monkeypatch):
         assert r["ok"] is False and "not responding" in r["error"]
     finally:
         server.set_client(None)
+
+
+def test_slim_keeps_key_fields_and_survives_schema_change():
+    rec = {"ProjectName": "מגרשים", "LamasName": "חולון", "PriceForMeter": "15,500.00", "WinnersSeriesA": 1}
+    assert datagov.slim("mechir_lamishtaken", rec) == {"ProjectName": "מגרשים", "LamasName": "חולון",
+                                                        "PriceForMeter": "15,500.00"}
+    odd = {"x": 1, "y": 2}
+    assert datagov.slim("mechir_lamishtaken", odd) == odd
+    assert datagov.slim("housing_pipeline", odd) == odd

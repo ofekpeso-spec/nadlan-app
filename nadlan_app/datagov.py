@@ -39,6 +39,28 @@ DATASETS: dict[str, dict[str, str]] = {
 
 _INTERNAL = {"_id", "_full_text", "rank", "_rank"}
 
+# Fields worth showing per dataset (verified against live data.gov.il, Nov 2026).
+# Unknown datasets / renamed fields fall back to returning the full record.
+KEY_FIELDS: dict[str, list[str]] = {
+    "urban_renewal": ["Yeshuv", "ShemMitcham", "YachadKayam", "YachadTosafti", "YachadMutza",
+                      "TaarichHachraza", "Maslul", "Status", "Bebitzua", "ShnatMatanTokef",
+                      "MisparTochnit", "KishurLatar", "KishurLaMapa"],
+    "construction_sites": ["site_name", "city_name", "executor_name", "build_types", "has_cranes",
+                           "safety_warrents", "sanctions", "sanctions_sum"],
+    "mechir_lamishtaken": ["ProjectName", "LamasName", "Neighborhood", "PriceForMeter",
+                           "LotteryHousingUnits", "Subscribers", "Winners", "LotteryExecutionDate",
+                           "LotteryEndSignupDate", "ProjectStatus", "LotteryStatusValue",
+                           "ProviderName", "Eligibility", "MarketingMethodDesc"],
+}
+
+
+def slim(dataset: str, rec: dict) -> dict:
+    keys = KEY_FIELDS.get(dataset)
+    if not keys:
+        return rec
+    out = {k: rec[k] for k in keys if k in rec}
+    return out if len(out) >= 2 else rec  # schema changed -> don't hide data
+
 
 class DataGovError(RuntimeError):
     pass
@@ -154,19 +176,17 @@ def lookup(client: DataGovClient, dataset: str, city: str, street: str | None = 
     rid = DATASETS[dataset]["resource_id"]
     title = DATASETS[dataset]["title"]
     city_recs: list[dict] = []
-    fields: list = []
     for q in ([f"{city} {street}"] if street else []) + [city]:
         res = client.search(rid, q=q, limit=500)
-        fields = res["fields"]
         recs = [r for r in res["records"] if matches(r, city, street)]
         if recs:
             return {"dataset": title, "query": {"city": city, "street": street}, "scope": "street" if street else "city",
-                    "matches": len(recs), "records": recs[:limit], "fields": fields}
+                    "matches": len(recs), "records": [slim(dataset, r) for r in recs[:limit]]}
         if q == city:
             city_recs = [r for r in res["records"] if matches(r, city)]
     if street and city_recs:
         return {"dataset": title, "query": {"city": city, "street": street}, "scope": "city",
                 "note": f"No records mention '{street}'. Showing records for {city} instead.",
-                "matches": len(city_recs), "records": city_recs[:limit], "fields": fields}
+                "matches": len(city_recs), "records": [slim(dataset, r) for r in city_recs[:limit]]}
     return {"dataset": title, "query": {"city": city, "street": street}, "scope": None,
-            "matches": 0, "records": [], "fields": fields}
+            "matches": 0, "records": []}
