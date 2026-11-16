@@ -1,182 +1,149 @@
 import asyncio
 import json
-import random
-from datetime import date, timedelta
 
 import pytest
 
-from nadlan_app import analytics, server
+from nadlan_app import datagov, server
 
-TODAY = date.today()
+RENEWAL = [
+    {"_id": 1, "Yeshuv": "תל אביב - יפו", "ShemMitcham": "סוקולוב-הרצל", "Ktovet": "רח' הרצל 10-20",
+     "YachadKayam": 48, "YachadTosafti": 120, "Status": "בביצוע", "_full_text": "x"},
+    {"_id": 2, "Yeshuv": "תל אביב - יפו", "ShemMitcham": "יד אליהו", "Ktovet": "שד' ההגנה 5",
+     "YachadKayam": 60, "YachadTosafti": 200, "Status": "הוכרז"},
+    {"_id": 3, "Yeshuv": "חולון", "ShemMitcham": "קוגל", "Ktovet": "קוגל 1", "YachadKayam": 30},
+]
+SITES = [{"_id": 1, "city": "תל אביב-יפו", "street": "הרצל", "builder": "א.ב. בנייה", "status": "פעיל"}]
+LOTTERY = [{"_id": 1, "LamasName": "חולון", "PricePerMeter": 15500, "Units": 120}]
+PIPELINE = [{"_id": 1, "Yishuv": "תל אביב-יפו", "Units": 3400}]
 
-
-def make_raw(n=60, seed=1):
-    rnd = random.Random(seed)
-    out = []
-    for i in range(n):
-        days = rnd.randint(0, 900)
-        rooms = rnd.choice([3, 3.5, 4, 4.5, 5])
-        sqm = rooms * 22 + rnd.randint(-8, 8)
-        # ~5%/yr appreciation, base 40k/sqm
-        ppsqm = 40000 * (1 - 0.05 * days / 365) * rnd.uniform(0.9, 1.1)
-        out.append({
-            "dealDate": (TODAY - timedelta(days=days)).isoformat() + "T00:00:00.000Z",
-            "dealAmount": f"{int(ppsqm * sqm):,}",
-            "assetArea": sqm, "assetRoomNum": rooms, "floorNo": str(rnd.randint(0, 9)),
-            "address_description": f"הרצל {rnd.randint(1, 40)}", "settlementNameHeb": "תל אביב-יפו",
-        })
-    out.append({"dealDate": None, "dealAmount": 100})          # junk -> dropped
-    out.append({"dealDate": "2024-01-01", "dealAmount": "0"})  # zero -> dropped
-    out.append(dict(out[0]))                                   # duplicate -> dropped
-    return out
+BY_RID = {
+    datagov.DATASETS["urban_renewal"]["resource_id"]: RENEWAL,
+    datagov.DATASETS["construction_sites"]["resource_id"]: SITES,
+    datagov.DATASETS["mechir_lamishtaken"]["resource_id"]: LOTTERY,
+    datagov.DATASETS["housing_pipeline"]["resource_id"]: PIPELINE,
+}
 
 
-class FakeGovmap:
-    def __init__(self, raw):
-        self.raw = raw
+class _Resp:
+    def __init__(self, status, data=None, text_only=False):
+        self.status_code, self._data, self._text_only = status, data, text_only
 
-    def autocomplete(self, text, max_results=5):
-        return [] if "nowhere" in text else [{"name": "הרצל 10, תל אביב-יפו", "point": [180000.0, 663000.0]}]
-
-    def polygons_near(self, point, radius_m=50):
-        return [{"polygon_id": "p1"}]
-
-    def deals_by_radius(self, point, radius_m=300):
-        return self.raw
+    def json(self):
+        if self._text_only:
+            raise ValueError("html")
+        return self._data
 
 
-def test_normalize_drops_junk_and_dupes():
-    deals = analytics.normalize_deals(make_raw())
-    assert len(deals) == 60
-    d = deals[0]
-    assert d["price"] > 0 and d["price_per_sqm"] and d["date"] <= TODAY.isoformat()
-    assert deals == sorted(deals, key=lambda x: x["date"], reverse=True)
+class FakeSession:
+    """Mimics CKAN. Rejects the first header set (like a bot filter) to exercise fallback."""
 
+    def __init__(self, block_first=True):
+        self.block_first, self.calls = block_first, []
 
-def test_alternate_keys_and_formats():
-    d = analytics.normalize_deal({"deal_date": "15/03/2025", "price": "₪2,500,000", "area": "100", "rooms": "4"})
-    assert d["date"] == "2025-03-15" and d["price"] == 2500000 and d["price_per_sqm"] == 25000
-
-
-def test_summary_and_trend_positive():
-    s = analytics.summarize(analytics.normalize_deals(make_raw(200)))
-    assert s["deal_count"] == 200
-    assert s["price_per_sqm"]["p25"] <= s["price_per_sqm"]["median"] <= s["price_per_sqm"]["p75"]
-    assert s["trend_12m"]["change_pct"] > 0  # synthetic data appreciates
-
-
-def test_filter_rooms_and_months():
-    deals = analytics.normalize_deals(make_raw(200))
-    f = analytics.filter_deals(deals, rooms=4, months_back=12)
-    assert f and all(d["rooms"] == 4 for d in f)
-    cutoff = analytics._months_ago(TODAY, 12).isoformat()
-    assert all(d["date"] >= cutoff for d in f)
-
-
-def test_estimate_value_reasonable():
-    est = analytics.estimate_value(analytics.normalize_deals(make_raw(200)), sqm=90, rooms=4)
-    assert est["ok"]
-    e = est["estimate"]
-    assert e["low"] <= e["mid"] <= e["high"]
-    assert 2_800_000 < e["mid"] < 3_900_000  # ~38-40k/sqm × 90
-
-
-def test_estimate_too_few():
-    assert analytics.estimate_value([], sqm=80)["ok"] is False
+    def request(self, method, url, params=None, headers=None, timeout=None):
+        self.calls.append((url, dict(params or {}), headers.get("User-Agent")))
+        if self.block_first and headers.get("User-Agent", "").startswith("NadlanIL"):
+            return _Resp(200, text_only=True)  # HTML challenge page
+        if url.endswith("/datastore_search"):
+            rows = BY_RID.get(params["resource_id"])
+            if rows is None:
+                return _Resp(404)
+            q = params.get("q")
+            # crude full-text: every word must appear
+            if q:
+                rows = [r for r in rows if all(w in json.dumps(r, ensure_ascii=False) for w in q.split())]
+            rows = rows[: int(params.get("limit", 100))]
+            return _Resp(200, {"success": True, "result": {
+                "records": rows, "total": len(rows),
+                "fields": [{"id": "_id"}] + [{"id": k} for k in (rows[0] if rows else {}) if k != "_id"]}})
+        if url.endswith("/package_search"):
+            return _Resp(200, {"success": True, "result": {"results": [{
+                "name": "kindergartens", "title": "גני ילדים", "organization": {"title": "משרד החינוך"},
+                "metadata_modified": "2026-10-01T00:00", "notes": "רשימת גנים",
+                "resources": [{"id": "rid-1", "name": "גנים", "format": "CSV", "datastore_active": True},
+                              {"id": "rid-2", "name": "pdf", "format": "PDF", "datastore_active": False}]}]}})
+        return _Resp(404)
 
 
 @pytest.fixture
-def fake():
-    server.set_client(FakeGovmap(make_raw(200)))
-    yield
+def fake(monkeypatch):
+    monkeypatch.setattr(datagov.time, "sleep", lambda s: None)
+    c = datagov.DataGovClient(session=FakeSession())
+    server.set_client(c)
+    yield c
     server.set_client(None)
 
 
 def _call(name, args):
     res = asyncio.run(server.mcp.call_tool(name, args))
-    # MCPServer may return (content, structured) or a result object; extract the dict
     if isinstance(res, tuple):
-        structured = res[1]
-        return structured.get("result", structured) if isinstance(structured, dict) else structured
-    if hasattr(res, "structured_content") and res.structured_content:
-        sc = res.structured_content
-        return sc.get("result", sc)
-    if hasattr(res, "structuredContent") and res.structuredContent:
-        sc = res.structuredContent
-        return sc.get("result", sc)
-    content = res.content if hasattr(res, "content") else res
-    return json.loads(content[0].text)
+        sc = res[1]
+        return sc.get("result", sc) if isinstance(sc, dict) else sc
+    for attr in ("structured_content", "structuredContent"):
+        sc = getattr(res, attr, None)
+        if sc:
+            return sc.get("result", sc)
+    return json.loads(res.content[0].text)
+
+
+def test_matches_normalization():
+    rec = {"a": "תל אביב - יפו", "b": "רח' הרצל 10"}
+    assert datagov.matches(rec, "תל אביב", "הרצל")
+    assert datagov.matches(rec, "תל אביב-יפו")
+    assert not datagov.matches(rec, "חולון")
+    assert datagov.matches({"c": "קרית אונו"}, "קריית אונו")
 
 
 def test_tools_listed():
     names = {t.name for t in asyncio.run(server.mcp.list_tools())}
-    assert names == {"search_address", "recent_deals", "area_price_summary", "estimate_apartment_value"}
+    assert names == {"urban_renewal_projects", "construction_sites", "subsidized_housing_lotteries",
+                     "housing_pipeline", "area_report", "find_open_datasets", "query_open_dataset"}
 
 
-def test_tool_calls(fake):
-    r = _call("recent_deals", {"address": "הרצל 10 תל אביב", "rooms": 4, "limit": 5})
-    assert r["ok"] and len(r["deals"]) == 5 and "Tax Authority" in r["source"]
-    s = _call("area_price_summary", {"address": "הרצל 10 תל אביב"})
-    assert s["ok"] and s["summary"]["deal_count"] > 0
-    e = _call("estimate_apartment_value", {"address": "הרצל 10 תל אביב", "sqm": 90, "rooms": 4})
-    assert e["ok"] and e["estimate"]["mid"] > 0
-    n = _call("recent_deals", {"address": "nowhere"})
-    assert n["ok"] is False and "not found" in n["error"]
+def test_urban_renewal_street_and_city(fake):
+    r = _call("urban_renewal_projects", {"city": "תל אביב", "street": "הרצל"})
+    assert r["ok"] and r["scope"] == "street" and r["matches"] == 1
+    assert "_id" not in r["records"][0] and "_full_text" not in r["records"][0]
+    r2 = _call("urban_renewal_projects", {"city": "תל אביב"})
+    assert r2["matches"] == 2
 
 
-# ---- GovmapClient against a fake HTTP session (no network) -------------------
-class _Resp:
-    def __init__(self, status, data=None):
-        self.status_code, self._data = status, data
-
-    def json(self):
-        if self._data is None:
-            raise ValueError("no json")
-        return self._data
+def test_street_not_found_falls_back_to_city(fake):
+    r = _call("urban_renewal_projects", {"city": "תל אביב", "street": "דיזנגוף"})
+    assert r["ok"] and r["scope"] == "city" and r["matches"] == 2 and "note" in r
 
 
-class FakeSession:
-    """Blocks header set 0 on real-estate paths with 403, like a WAF might."""
-    def __init__(self):
-        self.calls = []
-
-    def request(self, method, url, params=None, json=None, headers=None, timeout=None):
-        self.calls.append((method, url, params, headers.get("User-Agent")))
-        if "autocomplete" in url:
-            return _Resp(200, {"resultsCount": 1, "results": [
-                {"text": "הרצל 10, תל אביב-יפו", "type": "address", "shape": "POINT(3870574.19 3771516.47)"}]})
-        if "NadlanMCP" in headers.get("User-Agent", ""):
-            return _Resp(403)
-        if "/real-estate/deals/" in url:
-            return _Resp(200, [{"polygon_id": "far", "longitude": 3871574, "latitude": 3771516},
-                               {"polygon_id": "near", "longitude": 3870580, "latitude": 3771510}])
-        if "/street-deals/" in url:
-            pid = url.rsplit("/", 1)[1]
-            return _Resp(200, {"data": [
-                {"objectid": hash((pid, i, params.get("dealType"))) % 10**6, "dealAmount": 2_000_000 + i * 10_000,
-                 "dealDate": f"2026-0{1 + i % 9}-15T00:00:00", "assetArea": 80 + i, "assetRoomNum": 3.5,
-                 "floorNumber": i % 5, "streetNameHeb": "הרצל", "houseNum": str(10 + i),
-                 "settlementNameHeb": "תל אביב-יפו", "propertyTypeDescription": "דירה"} for i in range(8)],
-                "totalCount": 8})
-        if "/neighborhood-deals/" in url:
-            return _Resp(200, {"data": []})
-        return _Resp(404)
+def test_header_fallback_remembered(fake):
+    _call("construction_sites", {"city": "תל אביב"})
+    assert fake._good_headers == 1
+    assert any("not JSON" in str(d) or d["headers"] == 0 for d in fake.diagnostics)
 
 
-def test_client_flow_with_403_fallback(monkeypatch):
-    from nadlan_app import govmap
-    monkeypatch.setattr(govmap.time, "sleep", lambda s: None)
-    sess = FakeSession()
-    c = govmap.GovmapClient(session=sess)
-    hits = c.autocomplete("הרצל 10 תל אביב")
-    assert hits[0]["point"] == [3870574.19, 3771516.47]
-    raw = c.deals_by_radius(hits[0]["point"], 300)
-    deals = analytics.normalize_deals(raw)
-    assert len(deals) == 32  # 2 polygons x 2 deal types x 8
-    assert deals[0]["address"].startswith("הרצל") and deals[0]["property_type"] == "דירה"
-    # nearest polygon queried first
-    street_calls = [u for _, u, _, _ in sess.calls if "street-deals" in u]
-    assert street_calls[0].endswith("/near")
-    # after the first 403 the client remembers the working header set
-    assert c._good_headers != 0
-    assert any(d["status"] == 403 for d in c.diagnostics)
+def test_area_report(fake):
+    r = _call("area_report", {"city": "חולון"})
+    s = r["sections"]
+    assert r["ok"] and s["urban_renewal"]["matches"] == 1 and s["subsidized_lotteries"]["matches"] == 1
+    assert "nadlan.gov.il" in r["deal_prices"]
+
+
+def test_find_and_query(fake):
+    f = _call("find_open_datasets", {"query": "גני ילדים"})
+    assert f["ok"] and f["datasets"][0]["queryable_resources"] == [
+        {"resource_id": "rid-1", "name": "גנים", "format": "CSV"}]
+    q = _call("query_open_dataset", {"resource_id": datagov.DATASETS["housing_pipeline"]["resource_id"]})
+    assert q["ok"] and q["total"] == 1
+
+
+def test_service_down_gives_friendly_error(monkeypatch):
+    monkeypatch.setattr(datagov.time, "sleep", lambda s: None)
+
+    class Down:
+        def request(self, *a, **k):
+            return _Resp(503)
+
+    server.set_client(datagov.DataGovClient(session=Down()))
+    try:
+        r = _call("construction_sites", {"city": "חולון"})
+        assert r["ok"] is False and "not responding" in r["error"]
+    finally:
+        server.set_client(None)
