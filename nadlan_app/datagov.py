@@ -54,6 +54,21 @@ KEY_FIELDS: dict[str, list[str]] = {
 }
 
 
+def _lottery_date(rec: dict) -> str:
+    """'5/19/2019 10:57:39 AM' -> '2019-05-19' for sorting (unknown formats sort last)."""
+    from datetime import datetime
+    v = str(rec.get("LotteryExecutionDate") or "").strip()
+    for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(v, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return ""
+
+
+SORTERS = {"mechir_lamishtaken": _lottery_date}
+
+
 def slim(dataset: str, rec: dict) -> dict:
     keys = KEY_FIELDS.get(dataset)
     if not keys:
@@ -179,6 +194,8 @@ def lookup(client: DataGovClient, dataset: str, city: str, street: str | None = 
     for q in ([f"{city} {street}"] if street else []) + [city]:
         res = client.search(rid, q=q, limit=500)
         recs = [r for r in res["records"] if matches(r, city, street)]
+        if dataset in SORTERS:
+            recs.sort(key=SORTERS[dataset], reverse=True)  # newest first
         if recs:
             return {"dataset": title, "query": {"city": city, "street": street}, "scope": "street" if street else "city",
                     "matches": len(recs), "records": [slim(dataset, r) for r in recs[:limit]]}

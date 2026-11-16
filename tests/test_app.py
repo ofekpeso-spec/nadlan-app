@@ -164,3 +164,12 @@ def test_usage_stats_tracked(fake):
     assert server.STATS["calls"] == before + 1
     assert server.STATS["by_city"]["חולון"] >= 1
     assert server.STATS["recent"][0]["street"] == "סוקולוב"
+
+
+def test_lotteries_sorted_newest_first(fake, monkeypatch):
+    rows = [{"_id": i, "LamasName": "באר שבע", "ProjectName": f"p{i}", "PriceForMeter": "1",
+             "LotteryExecutionDate": d} for i, d in enumerate(
+        ["1/19/2020 4:18:43 PM", "3/02/2025 10:00:00 AM", "bad", "2/13/2019 11:57:24 AM"])]
+    monkeypatch.setitem(BY_RID, datagov.DATASETS["mechir_lamishtaken"]["resource_id"], rows)
+    r = _call("subsidized_housing_lotteries", {"city": "באר שבע"})
+    assert [x["ProjectName"] for x in r["records"]] == ["p1", "p0", "p3", "p2"]
