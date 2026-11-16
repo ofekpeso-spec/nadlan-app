@@ -2,5 +2,5 @@ services:
   - type: web
     name: nadlan-il
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /health
