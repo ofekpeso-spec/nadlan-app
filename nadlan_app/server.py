@@ -166,6 +166,11 @@ async def icon(_: Request) -> FileResponse:
     return FileResponse(STATIC / "icon.png", media_type="image/png")
 
 
+@mcp.custom_route("/favicon.ico", methods=["GET"])
+async def favicon(_: Request) -> FileResponse:
+    return FileResponse(STATIC / "favicon.ico", media_type="image/x-icon")
+
+
 @mcp.custom_route("/stats", methods=["GET"])
 async def stats(request: Request) -> JSONResponse:
     """Usage counters. Set STATS_KEY on the server and open /stats?key=... to keep it private."""
