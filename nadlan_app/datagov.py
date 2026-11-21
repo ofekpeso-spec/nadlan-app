@@ -164,22 +164,32 @@ def clean(rec: dict) -> dict:
     return {k: v for k, v in rec.items() if k not in _INTERNAL and v not in (None, "", " ")}
 
 
+_STREET_PREFIXES = ("רחוב", "רח", "שדרות", "שד")
+
+
 def _norm(s: str) -> str:
     s = str(s)
     for ch in "\"'`׳״-–_,.()":
         s = s.replace(ch, " ")
-    for prefix in ("רחוב ", "רח ", "שדרות ", "שד "):
-        s = s.replace(prefix, " ")
     return " ".join(s.split()).lower()
+
+
+def _norm_term(s: str) -> str:
+    """Normalize a search term and drop a leading street word ("רח' הרצל" -> "הרצל").
+    Only the term is trimmed, never the record text, so the city "שדרות" or "מזרח" still match."""
+    words = _norm(s).split()
+    if len(words) > 1 and words[0] in _STREET_PREFIXES:
+        words = words[1:]
+    return " ".join(words)
 
 
 def matches(rec: dict, *terms: str | None) -> bool:
     """True if every non-empty term appears (normalized) somewhere in the record's values."""
     blob = _norm(" ".join(str(v) for v in rec.values()))
     for t in terms:
-        if t and _norm(t) not in blob:
+        if t and _norm_term(t) not in blob:
             # tolerate "תל אביב" vs "תל אביב יפו", "קריית" vs "קרית"
-            alt = _norm(t).replace("קריית", "קרית").replace("יי", "י")
+            alt = _norm_term(t).replace("קריית", "קרית").replace("יי", "י")
             if alt not in blob.replace("קריית", "קרית").replace("יי", "י"):
                 return False
     return True

@@ -94,6 +94,14 @@ def test_matches_normalization():
     assert datagov.matches({"c": "קרית אונו"}, "קריית אונו")
 
 
+def test_street_words_only_trimmed_from_the_search_term():
+    # the city "שדרות" and words like "מזרח" must not be eaten by the street-prefix cleanup
+    assert datagov.matches({"name": "מתחם א", "city": "שדרות"}, "שדרות")
+    assert datagov.matches({"a": "מזרח העיר", "b": "x"}, "מזרח")
+    assert datagov.matches({"s": "שד' רוטשילד 5"}, "שדרות רוטשילד")
+    assert datagov.matches({"s": "רחוב הרצל"}, "רח' הרצל")
+
+
 def test_tools_listed():
     names = {t.name for t in asyncio.run(server.mcp.list_tools())}
     assert names == {"urban_renewal_projects", "construction_sites", "subsidized_housing_lotteries",
